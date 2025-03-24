@@ -151,10 +151,13 @@ class ReasoningTextBlock(BedrockBaseModel):
     signature: str | None = None
 
 
-class ReasoningContentBlock(BedrockBaseModel):
+class ReasoningContentBlockText(BedrockBaseModel):
     reasoning_text: ReasoningTextBlock | None = None
+
+class ReasoningContentBlockRedactedContent(BedrockBaseModel):
     redacted_content: bytes | None = None
 
+ReasoningContentBlock = ReasoningContentBlockText | ReasoningContentBlockRedactedContent
 
 class ToolUseBlock(BedrockBaseModel):
     input: dict[str, Any]
@@ -257,15 +260,15 @@ MetadataValue = Annotated[
 
 class BedrockConverseRequest(BedrockBaseModel):
     model_id: str = Field(min_length=1, max_length=2048)
-    messages: list[Message] | None
-    system: SystemContentBlock | None
-    inference_config: InferenceConfiguration | None
-    tool_config: ToolConfiguration | None
-    guardrail_config: GuardrailConfiguration | None
-    additional_model_request_fields: dict[str, Any] | None
-    prompt_variables: dict[str, PromptVariableValues] | None
+    messages: list[Message] | None = None
+    system: SystemContentBlock | None = None
+    inference_config: InferenceConfiguration | None = None
+    tool_config: ToolConfiguration | None = None
+    guardrail_config: GuardrailConfiguration | None = None
+    additional_model_request_fields: dict[str, Any] | None = None
+    prompt_variables: dict[str, PromptVariableValues] | None = None
     additional_model_response_field_paths: Annotated[
         list[FieldPath], Len(max_length=10)
-    ] | None
-    request_metadata: dict[MetadataKey, MetadataValue] | None
-    performance_config: PerformanceConfiguration | None
+    ] | None = None
+    request_metadata: dict[MetadataKey, MetadataValue] | None = None
+    performance_config: PerformanceConfiguration | None = None
