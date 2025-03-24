@@ -13,7 +13,9 @@ from pydantic.alias_generators import to_camel
 
 class BedrockBaseModel(BaseModel):
     """
-    Base model for all Bedrock API models, which serializes all field names to camelCase
+    Base model for all Bedrock API models, which upon serialization:
+      - excludes all unset optional fields
+      - converts all field names to camelCase
     """
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
@@ -23,10 +25,6 @@ class BedrockBaseModel(BaseModel):
 
 
 class GuardrailConfiguration(BedrockBaseModel):
-    """
-    https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_GuardrailConfiguration.html
-    """
-
     guardrailIdentifier: str = Field(
         max_length=2048,
         pattern=r"^(([a-z0-9]+)|(arn:aws(-[^:]+)?:bedrock:[a-z0-9-]{1,20}:[0-9]{12}:guardrail/[a-z0-9]+))$",
@@ -36,10 +34,6 @@ class GuardrailConfiguration(BedrockBaseModel):
 
 
 class InferenceConfiguration(BedrockBaseModel):
-    """
-    https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_InferenceConfiguration.html
-    """
-
     max_tokens: int | None = None
     stop_sequences: list[str] | None = None
     temperature: float | None = None
@@ -47,17 +41,11 @@ class InferenceConfiguration(BedrockBaseModel):
 
 
 class AnyToolChoice(BedrockBaseModel):
-    @computed_field
-    @property
-    def any(self) -> dict:
-        return {}
+    any: dict = {}
 
 
 class AutoToolChoice(BedrockBaseModel):
-    @computed_field
-    @property
-    def auto(self) -> dict:
-        return {}
+    auto: dict = {}
 
 
 class SpecificToolChoice(BedrockBaseModel):
@@ -71,50 +59,30 @@ ToolChoice = AnyToolChoice | AutoToolChoice | SpecificToolChoice
 
 
 class ToolInputSchema(BedrockBaseModel):
-    """
-    https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ToolInputSchema.html
-    """
-
     json: dict[str, Any]
 
 
 class ToolSpecification(BedrockBaseModel):
-    """
-    https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ToolSpecification.html
-    """
-
     name: str = Field(pattern=r"^[a-zA-Z0-9_-]+$")
     description: str | None = None
     input_schema: ToolInputSchema
 
 
 class Tool(BedrockBaseModel):
-    """
-    https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Tool.html
-    """
-
     tool_spec: ToolSpecification
 
 
 class ToolConfiguration(BedrockBaseModel):
-    """
-    https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ToolConfiguration.html
-    """
-
     tools: dict[str, Tool]
     tool_choice: ToolChoice | None = None
 
 
-class DocumentSource(BedrockBaseModel):
+class Source(BedrockBaseModel):
     bytes: bytes
 
 
-class ImageSource(BedrockBaseModel):
-    bytes: bytes
-
-
-class VideoSourceBytes(BedrockBaseModel):
-    bytes: bytes
+DocumentSource = Source
+ImageSource = Source
 
 
 class S3Location(BedrockBaseModel):
@@ -134,13 +102,7 @@ class VideoSourceS3Location(BedrockBaseModel):
     s3_location: S3Location
 
 
-VideoSource = VideoSourceBytes | VideoSourceS3Location
-
-
-class DocumentBlock(BedrockBaseModel):
-    format: Literal["pdf", "csv", "doc", "docx", "xls", "xlsx", "html", "txt", "md"]
-    name: str = Field(min_length=1, max_length=200)
-    source: DocumentSource
+VideoSource = Source | VideoSourceS3Location
 
 
 class GuardrailConverseImageBlock(BedrockBaseModel):
@@ -156,6 +118,12 @@ class GuardrailConverseTextBlock(BedrockBaseModel):
 
 
 GuardrailConverseContentBlock = GuardrailConverseImageBlock | GuardrailConverseTextBlock
+
+
+class DocumentBlock(BedrockBaseModel):
+    format: Literal["pdf", "csv", "doc", "docx", "xls", "xlsx", "html", "txt", "md"]
+    name: str = Field(min_length=1, max_length=200)
+    source: DocumentSource
 
 
 class ImageBlock(BedrockBaseModel):
@@ -207,7 +175,7 @@ class ContentBlockJson(BedrockBaseModel):
 
 
 class ContentBlockText(BedrockBaseModel):
-    text: str
+    text: str | None = Field(min_length=1, default=None)
 
 
 class ContentBlockVideo(BedrockBaseModel):
@@ -276,14 +244,6 @@ class PerformanceConfiguration(BedrockBaseModel):
 
 class PromptVariableValues(BedrockBaseModel):
     text: str | None = None
-
-
-class ContentBlockText(BedrockBaseModel):
-    text: str | None = Field(min_length=1, default=None)
-
-
-class SystemContentBlockGuardrail(BedrockBaseModel):
-    guard_content: GuardrailConverseContentBlock | None = None
 
 
 SystemContentBlock = ContentBlockText | ContentBlockGuardrail
