@@ -25,11 +25,11 @@ class BedrockBaseModel(BaseModel):
 
 
 class GuardrailConfiguration(BedrockBaseModel):
-    guardrailIdentifier: str = Field(
+    guardrail_identifier: str = Field(
         max_length=2048,
         pattern=r"^(([a-z0-9]+)|(arn:aws(-[^:]+)?:bedrock:[a-z0-9-]{1,20}:[0-9]{12}:guardrail/[a-z0-9]+))$",
     )
-    guardrailVersion: str = Field(pattern=r"^(([1-9][0-9]{0,7})|(DRAFT))$")
+    guardrail_version: str = Field(pattern=r"^(([1-9][0-9]{0,7})|(DRAFT))$")
     trace: Literal["enabled", "disabled"] | None = None
 
 
@@ -47,10 +47,10 @@ class AnyToolChoice(BedrockBaseModel):
 class AutoToolChoice(BedrockBaseModel):
     auto: dict = {}
 
+class NamedTool(BedrockBaseModel):
+    name: str
 
 class SpecificToolChoice(BedrockBaseModel):
-    class NamedTool(BedrockBaseModel):
-        name: str
 
     tool: NamedTool
 
@@ -213,10 +213,6 @@ class ContentBlockToolUse(BedrockBaseModel):
     tool_use: ToolUseBlock
 
 
-class ContentBlockVideo(BedrockBaseModel):
-    video: VideoBlock
-
-
 ContentBlock = (
     ContentBlockDocument
     | ContentBlockGuardrail
@@ -248,20 +244,18 @@ class PromptVariableValues(BedrockBaseModel):
 
 SystemContentBlock = ContentBlockText | ContentBlockGuardrail
 
+FieldPath = Annotated[str, Field(min_length=1, max_length=256)]
+MetadataKey = Annotated[
+    str,
+    Field(min_length=1, max_length=256, pattern=r"^[a-zA-Z0-9\s:_@$#=/+,-.]{1,256}$"),
+]
+MetadataValue = Annotated[
+    str,
+    Field(max_length=256, pattern=r"^[a-zA-Z0-9\s:_@$#=/+,-.]{0,256}$"),
+]
 
-class BedrockConverseParams(BedrockBaseModel):
-    FieldPath = Annotated[str, Field(min_length=1, max_length=256)]
-    MetadataKey = Annotated[
-        str,
-        Field(
-            min_length=1, max_length=256, pattern=r"^[a-zA-Z0-9\s:_@$#=/+,-.]{1,256}$"
-        ),
-    ]
-    MetadataValue = Annotated[
-        str,
-        Field(max_length=256, pattern=r"^[a-zA-Z0-9\s:_@$#=/+,-.]{0,256}$"),
-    ]
 
+class BedrockConverseRequest(BedrockBaseModel):
     model_id: str = Field(min_length=1, max_length=2048)
     messages: list[Message] | None
     system: SystemContentBlock | None
