@@ -2,6 +2,8 @@ from langchain_aws.chat_models.bedrock_converse_types import (
     BedrockConverseRequest,
     ContentBlockDocument,
     ContentBlockGuardrail,
+    GuardrailConverseContentBlockImage,
+    GuardrailConverseContentBlockText,
     ContentBlockImage,
     ContentBlockJson,
     ContentBlockText,
@@ -150,36 +152,44 @@ def test_content_blocks():
     assert document_block.to_bedrock_dict() == document_block_expected
 
     guardrail_image_block = ContentBlockGuardrail(
-        guard_content=GuardrailConverseImageBlock(
-            format="png",
-            source=ImageSource(
-                bytes=b"png bytes",
-            ),
+        guard_content=GuardrailConverseContentBlockImage(
+            image=GuardrailConverseImageBlock(
+                format="png",
+                source=ImageSource(
+                    bytes=b"png bytes",
+                ),
+            )
         )
     )
 
     guardrail_image_block_expected = {
         "guardContent": {
-            "format": "png",
-            "source": {
-                "bytes": b"png bytes",
-            },
+            "image": {
+                "format": "png",
+                "source": {
+                    "bytes": b"png bytes",
+                },
+            }
         },
     }
 
     assert guardrail_image_block.to_bedrock_dict() == guardrail_image_block_expected
 
     guardrail_text_block = ContentBlockGuardrail(
-        guard_content=GuardrailConverseTextBlock(
-            text="some very rude things",
-            qualifiers=["grounding_source", "query", "guard_content"],
+        guard_content=GuardrailConverseContentBlockText(
+            text=GuardrailConverseTextBlock(
+                text="some very rude things",
+                qualifiers=["grounding_source", "query", "guard_content"],
+            )
         )
     )
 
     guardrail_text_block_expected = {
         "guardContent": {
-            "text": "some very rude things",
-            "qualifiers": ["grounding_source", "query", "guard_content"],
+            "text": {
+                "text": "some very rude things",
+                "qualifiers": ["grounding_source", "query", "guard_content"],
+            }
         },
     }
 
@@ -334,7 +344,7 @@ def test_bedrock_converse_request():
                 "content": [
                     {
                         "guardContent": {
-                            "text": "Hello, how are you?",
+                            "text": {"text": "Hello, how are you?"},
                         },
                     },
                 ],
@@ -404,7 +414,7 @@ def test_bedrock_converse_request():
                 "content": [
                     {
                         "guard_content": {
-                            "text": "Hello, how are you?",
+                            "text": {"text": "Hello, how are you?"},
                         },
                     },
                 ],
