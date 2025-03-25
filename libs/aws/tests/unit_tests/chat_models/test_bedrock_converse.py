@@ -242,7 +242,7 @@ def test__messages_to_bedrock() -> None:
                     "type": "video",
                     "video": {
                         "format": "mp4",
-                        "source": {"s3Location": {"uri": "s3_url"}},
+                        "source": {"s3Location": {"uri": "s3://bucket/key"}},
                     },
                 }
             ]
@@ -327,7 +327,7 @@ def test__messages_to_bedrock() -> None:
                 {
                     "video": {
                         "format": "mp4",
-                        "source": {"s3Location": {"uri": "s3_url"}},
+                        "source": {"s3Location": {"uri": "s3://bucket/key"}},
                     }
                 },
             ],
@@ -798,7 +798,7 @@ def test__lc_content_to_bedrock_mixed_signatures() -> None:
             content=[
                 {
                     "type": "reasoning_content",
-                    "reasoningContent": {
+                    "reasoning_content": {
                         "text": "Neural networks are inspired by biological neurons.",
                         "signature": (
                             "nn-signature"
@@ -807,7 +807,7 @@ def test__lc_content_to_bedrock_mixed_signatures() -> None:
                 },
                 {
                     "type": "reasoning_content",
-                    "reasoningContent": {
+                    "reasoning_content": {
                         "text": "They consist of interconnected layers of nodes.",
                         "signature": "",  # Empty signature - should be omitted
                     },
@@ -878,7 +878,7 @@ def test__lc_content_to_bedrock_mixed_signatures() -> None:
         {"type": "text", "text": "Some text"},
         {
             "type": "reasoning_content",
-            "reasoningContent": {"text": "This is reasoning", "signature": ""},
+            "reasoning_content": {"text": "This is reasoning", "signature": ""},
         },
     ]
 
@@ -886,14 +886,14 @@ def test__lc_content_to_bedrock_mixed_signatures() -> None:
 
     # Verify reasoning_content block was omitted because it has an empty signature
     assert len(bedrock_content) == 1
-    assert bedrock_content[0] == {"text": "Some text"}
+    assert bedrock_content[0].to_bedrock_dict() == {"text": "Some text"}
 
     # Test with signature present
     content = [
         {"type": "text", "text": "Some text"},
         {
             "type": "reasoning_content",
-            "reasoningContent": {
+            "reasoning_content": {
                 "text": "This is reasoning",
                 "signature": "some-signature",
             },
@@ -904,8 +904,8 @@ def test__lc_content_to_bedrock_mixed_signatures() -> None:
 
     # Verify that the reasoning_content block is included when it has a signature
     assert len(bedrock_content) == 2
-    assert bedrock_content[0] == {"text": "Some text"}
-    assert bedrock_content[1] == {
+    assert bedrock_content[0].to_bedrock_dict() == {"text": "Some text"}
+    assert bedrock_content[1].to_bedrock_dict() == {
         "reasoningContent": {
             "reasoningText": {
                 "text": "This is reasoning",
@@ -929,7 +929,7 @@ def test__lc_content_to_bedrock_reasoning_content_signature() -> None:
             content=[
                 {
                     "type": "reasoning_content",
-                    "reasoningContent": {
+                    "reasoning_content": {
                         "text": "Quantum computing uses quantum bits or qubits...",
                         "signature": (
                             "qc-signature"
@@ -952,7 +952,7 @@ def test__lc_content_to_bedrock_reasoning_content_signature() -> None:
             content=[
                 {
                     "type": "reasoning_content",
-                    "reasoningContent": {
+                    "reasoning_content": {
                         "text": (
                             "Unlike classical bits that are either 0 or 1, qubits can "
                             "be in superposition."
@@ -977,7 +977,7 @@ def test__lc_content_to_bedrock_reasoning_content_signature() -> None:
             content=[
                 {
                     "type": "reasoning_content",
-                    "reasoningContent": {
+                    "reasoning_content": {
                         "text": (
                             "Quantum computing excels at certain types of problems..."
                         ),
@@ -988,7 +988,7 @@ def test__lc_content_to_bedrock_reasoning_content_signature() -> None:
                 },
                 {
                     "type": "reasoning_content",
-                    "reasoningContent": {
+                    "reasoning_content": {
                         "text": (
                             "Examples include cryptography, optimization, and "
                             "simulation."

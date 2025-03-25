@@ -28,6 +28,7 @@ from langchain_aws.chat_models.bedrock_converse_types import (
     ToolUseBlock,
     VideoBlock,
     VideoSourceS3Location,
+    content_block,
 )
 
 
@@ -324,7 +325,7 @@ def test_messages():
     assert [msg.to_bedrock_dict() for msg in messages] == messages_expected
 
 
-def test_bedrock_converse_snake():
+def test_bedrock_converse_request():
     camel_kwargs = {
         "modelId": "model_id",
         "messages": [
@@ -352,9 +353,11 @@ def test_bedrock_converse_snake():
                 ],
             },
         ],
-        "system": {
-            "text": "system text",
-        },
+        "system": [
+            {
+                "text": "system text",
+            }
+        ],
         "inferenceConfig": {
             "maxTokens": 5,
             "stopSequences": ["stop"],
@@ -420,9 +423,11 @@ def test_bedrock_converse_snake():
                 ],
             },
         ],
-        "system": {
-            "text": "system text",
-        },
+        "system": [
+            {
+                "text": "system text",
+            }
+        ],
         "inference_config": {
             "max_tokens": 5,
             "stop_sequences": ["stop"],

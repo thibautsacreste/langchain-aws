@@ -7,7 +7,8 @@ https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedro
 from typing import Annotated, Any, Literal
 
 from annotated_types import Len
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic.type_adapter import TypeAdapter
 from pydantic.alias_generators import to_camel
 
 
@@ -21,7 +22,7 @@ class BedrockBaseModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     def to_bedrock_dict(self):
-        return self.model_dump(by_alias=True, exclude_unset=True)
+        return self.model_dump(by_alias=True, exclude_unset=True, exclude_none=True)
 
 
 class GuardrailConfiguration(BedrockBaseModel):
@@ -47,11 +48,12 @@ class AnyToolChoice(BedrockBaseModel):
 class AutoToolChoice(BedrockBaseModel):
     auto: dict = {}
 
+
 class NamedTool(BedrockBaseModel):
     name: str
 
-class SpecificToolChoice(BedrockBaseModel):
 
+class SpecificToolChoice(BedrockBaseModel):
     tool: NamedTool
 
 
@@ -77,12 +79,12 @@ class ToolConfiguration(BedrockBaseModel):
     tool_choice: ToolChoice | None = None
 
 
-class Source(BedrockBaseModel):
+class SourceBytes(BedrockBaseModel):
     bytes: bytes
 
 
-DocumentSource = Source
-ImageSource = Source
+DocumentSource = SourceBytes
+ImageSource = SourceBytes
 
 
 class S3Location(BedrockBaseModel):
@@ -102,7 +104,7 @@ class VideoSourceS3Location(BedrockBaseModel):
     s3_location: S3Location
 
 
-VideoSource = Source | VideoSourceS3Location
+VideoSource = SourceBytes | VideoSourceS3Location
 
 
 class GuardrailConverseImageBlock(BedrockBaseModel):
@@ -117,7 +119,17 @@ class GuardrailConverseTextBlock(BedrockBaseModel):
     ] | None = None
 
 
-GuardrailConverseContentBlock = GuardrailConverseImageBlock | GuardrailConverseTextBlock
+class GuardrailConverseContentBlockText(BedrockBaseModel):
+    text: GuardrailConverseTextBlock
+
+
+class GuardrailConverseContentBlockImage(BedrockBaseModel):
+    image: GuardrailConverseImageBlock
+
+
+GuardrailConverseContentBlock = (
+    GuardrailConverseContentBlockText | GuardrailConverseContentBlockImage
+)
 
 
 class DocumentBlock(BedrockBaseModel):
@@ -154,10 +166,13 @@ class ReasoningTextBlock(BedrockBaseModel):
 class ReasoningContentBlockText(BedrockBaseModel):
     reasoning_text: ReasoningTextBlock | None = None
 
+
 class ReasoningContentBlockRedactedContent(BedrockBaseModel):
     redacted_content: bytes | None = None
 
+
 ReasoningContentBlock = ReasoningContentBlockText | ReasoningContentBlockRedactedContent
+
 
 class ToolUseBlock(BedrockBaseModel):
     input: dict[str, Any]
@@ -228,6 +243,10 @@ ContentBlock = (
 )
 
 
+def content_block(kwargs: dict[str, Any]) -> ContentBlock:
+    return TypeAdapter(ContentBlock).validate_python(kwargs)
+
+
 class Message(BedrockBaseModel):
     """
     https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Message.html
@@ -261,7 +280,7 @@ MetadataValue = Annotated[
 class BedrockConverseRequest(BedrockBaseModel):
     model_id: str = Field(min_length=1, max_length=2048)
     messages: list[Message] | None = None
-    system: SystemContentBlock | None = None
+    system: list[SystemContentBlock] | None = None
     inference_config: InferenceConfiguration | None = None
     tool_config: ToolConfiguration | None = None
     guardrail_config: GuardrailConfiguration | None = None

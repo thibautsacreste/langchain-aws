@@ -55,6 +55,7 @@ from langchain_core.utils.pydantic import TypeBaseModel, is_basemodel_subclass
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from typing_extensions import Self
 
+import langchain_aws.chat_models.bedrock_converse_types as converse
 from langchain_aws.function_calling import ToolsOutputParser
 
 logger = logging.getLogger(__name__)
@@ -515,7 +516,8 @@ class ChatBedrockConverse(BaseChatModel):
             (provider == "meta")
             or
             # All Mistral models
-            (provider == "mistral") or
+            (provider == "mistral")
+            or
             # DeepSeek-R1 models
             (provider == "deepseek" and "r1" in model_id_lower)
         ):
@@ -626,17 +628,11 @@ class ChatBedrockConverse(BaseChatModel):
         **kwargs: Any,
     ) -> ChatResult:
         """Top Level call"""
-        bedrock_messages, system = _messages_to_bedrock(messages)
-        logger.debug(f"input message to bedrock: {bedrock_messages}")
-        logger.debug(f"System message to bedrock: {system}")
-        params = self._converse_params(
-            stop=stop, **_snake_to_camel_keys(kwargs, excluded_keys={"inputSchema"})
-        )
-        logger.debug(f"Input params: {params}")
+        params = self._converse_params(messages, stop=stop, **kwargs)
+        logger.debug(f"Bedrock params: {params}")
         logger.info("Using Bedrock Converse API to generate response")
-        response = self.client.converse(
-            messages=bedrock_messages, system=system, **params
-        )
+        response = self.client.converse(**params)
+
         logger.debug(f"Response from Bedrock: {response}")
         response_message = _parse_response(response)
         return ChatResult(generations=[ChatGeneration(message=response_message)])
@@ -648,13 +644,9 @@ class ChatBedrockConverse(BaseChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> Iterator[ChatGenerationChunk]:
-        bedrock_messages, system = _messages_to_bedrock(messages)
-        params = self._converse_params(
-            stop=stop, **_snake_to_camel_keys(kwargs, excluded_keys={"inputSchema"})
-        )
-        response = self.client.converse_stream(
-            messages=bedrock_messages, system=system, **params
-        )
+        params = self._converse_params(messages, stop=stop, **kwargs)
+        logger.debug(f"Bedrock params: {params}")
+        response = self.client.converse_stream(**params)
         for event in response["stream"]:
             if message_chunk := _parse_stream_event(event):
                 generation_chunk = ChatGenerationChunk(message=message_chunk)
@@ -803,50 +795,58 @@ class ChatBedrockConverse(BaseChatModel):
     def _converse_params(
         self,
         *,
+        messages,
         stop: Optional[List[str]] = None,
-        stopSequences: Optional[List[str]] = None,
-        maxTokens: Optional[List[str]] = None,
+        stop_sequences: Optional[List[str]] = None,
+        max_tokens: Optional[List[str]] = None,
         temperature: Optional[float] = None,
-        topP: Optional[float] = None,
+        top_p: Optional[float] = None,
         tools: Optional[List] = None,
-        toolChoice: Optional[dict] = None,
-        modelId: Optional[str] = None,
-        inferenceConfig: Optional[dict] = None,
-        toolConfig: Optional[dict] = None,
-        additionalModelRequestFields: Optional[dict] = None,
-        additionalModelResponseFieldPaths: Optional[List[str]] = None,
-        guardrailConfig: Optional[dict] = None,
-        performanceConfig: Optional[Mapping[str, Any]] = None,
-        requestMetadata: Optional[dict] = None,
+        tool_choice: Optional[dict] = None,
+        model_id: Optional[str] = None,
+        inference_config: Optional[dict] = None,
+        tool_config: Optional[dict] = None,
+        additional_model_request_fields: Optional[dict] = None,
+        additional_model_response_field_paths: Optional[List[str]] = None,
+        guardrail_config: Optional[dict] = None,
+        performance_config: Optional[Mapping[str, Any]] = None,
+        request_metadata: Optional[dict] = None,
     ) -> Dict[str, Any]:
-        if not inferenceConfig:
-            inferenceConfig = {
-                "maxTokens": maxTokens or self.max_tokens,
-                "temperature": temperature or self.temperature,
-                "topP": self.top_p or topP,
-                "stopSequences": stop or stopSequences or self.stop_sequences,
-            }
-        if not toolConfig and tools:
-            toolChoice = _format_tool_choice(toolChoice) if toolChoice else None
-            toolConfig = {"tools": _format_tools(tools), "toolChoice": toolChoice}
+        bedrock_messages, system = _messages_to_bedrock(messages)
+        logger.debug(f"input message to bedrock: {bedrock_messages}")
+        logger.debug(f"System message to bedrock: {system}")
 
-        return _drop_none(
-            {
-                "modelId": modelId or self.model_id,
-                "inferenceConfig": inferenceConfig,
-                "toolConfig": toolConfig,
-                "additionalModelRequestFields": (
-                    additionalModelRequestFields or self.additional_model_request_fields
+        if not inference_config:
+            inference_config = {
+                "max_tokens": max_tokens or self.max_tokens,
+                "temperature": temperature or self.temperature,
+                "top_p": self.top_p or top_p,
+                "stop_sequences": stop or stop_sequences or self.stop_sequences,
+            }
+        if not tool_config and tools:
+            tool_choice = _format_tool_choice(tool_choice) if tool_choice else None
+            tool_config = {"tools": _format_tools(tools), "tool_choice": tool_choice}
+
+        return converse.BedrockConverseRequest(
+            **{
+                "model_id": model_id or self.model_id,
+                "messages": bedrock_messages,
+                "system": system,
+                "inference_config": inference_config,
+                "tool_config": tool_config,
+                "additional_model_request_fields": (
+                    additional_model_request_fields
+                    or self.additional_model_request_fields
                 ),
-                "additionalModelResponseFieldPaths": (
-                    additionalModelResponseFieldPaths
+                "additional_model_response_field_paths": (
+                    additional_model_response_field_paths
                     or self.additional_model_response_field_paths
                 ),
-                "guardrailConfig": guardrailConfig or self.guardrail_config,
-                "performanceConfig": performanceConfig or self.performance_config,
-                "requestMetadata": requestMetadata or self.request_metadata,
+                "guardrail_config": guardrail_config or self.guardrail_config,
+                "performance_config": performance_config or self.performance_config,
+                "request_metadata": request_metadata or self.request_metadata,
             }
-        )
+        ).to_bedrock_dict()
 
     def _get_ls_params(
         self, stop: Optional[List[str]] = None, **kwargs: Any
@@ -889,10 +889,10 @@ class ChatBedrockConverse(BaseChatModel):
 
 def _messages_to_bedrock(
     messages: List[BaseMessage],
-) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+) -> Tuple[List[dict[str, Any]], List[dict[str, Any]]]:
     """Handle Bedrock converse and Anthropic style content blocks"""
-    bedrock_messages: List[Dict[str, Any]] = []
-    bedrock_system: List[Dict[str, Any]] = []
+    bedrock_messages: List[converse.Message] = []
+    bedrock_system: List[converse.SystemContentBlock] = []
     # Merge system, human, ai message runs because Anthropic expects (at most) 1
     # system message then alternating human/ai messages.
     messages = merge_message_runs(messages)
@@ -903,34 +903,36 @@ def _messages_to_bedrock(
             # tool message will be merged with the first human message, so the second
             # human message will now be preceded by a human message and should also
             # be merged with it.
-            if bedrock_messages and bedrock_messages[-1]["role"] == "user":
-                bedrock_messages[-1]["content"].extend(content)
+            if bedrock_messages and bedrock_messages[-1].role == "user":
+                bedrock_messages[-1].content.extend(content)
             else:
-                bedrock_messages.append({"role": "user", "content": content})
+                bedrock_messages.append(converse.Message(role="user", content=content))
         elif isinstance(msg, AIMessage):
             content = _upsert_tool_calls_to_bedrock_content(content, msg.tool_calls)
-            bedrock_messages.append({"role": "assistant", "content": content})
+            bedrock_messages.append(converse.Message(role="assistant", content=content))
         elif isinstance(msg, SystemMessage):
             bedrock_system.extend(content)
         elif isinstance(msg, ToolMessage):
-            if bedrock_messages and bedrock_messages[-1]["role"] == "user":
+            if bedrock_messages and bedrock_messages[-1].role == "user":
                 curr = bedrock_messages.pop()
             else:
-                curr = {"role": "user", "content": []}
+                curr = converse.Message(role="user", content=[])
 
-            curr["content"].append(
-                {
-                    "toolResult": {
-                        "content": content,
-                        "toolUseId": msg.tool_call_id,
-                        "status": msg.status,
-                    }
-                }
+            curr.content.append(
+                converse.ContentBlockToolResult(
+                    tool_result=converse.ToolResultBlock(
+                        content=content,
+                        tool_use_id=msg.tool_call_id,
+                        status=msg.status,
+                    )
+                )
             )
             bedrock_messages.append(curr)
         else:
             raise ValueError(f"Unsupported message type {type(msg)}")
-    return bedrock_messages, bedrock_system
+    messages_dicts = [m.to_bedrock_dict() for m in bedrock_messages]
+    system_dicts = [m.to_bedrock_dict() for m in bedrock_system]
+    return messages_dicts, system_dicts
 
 
 def _extract_response_metadata(response: Dict[str, Any]) -> Dict[str, Any]:
@@ -1018,125 +1020,139 @@ def _parse_stream_event(event: Dict[str, Any]) -> Optional[BaseMessageChunk]:
 
 def _lc_content_to_bedrock(
     content: Union[str, List[Union[str, Dict[str, Any]]]],
-) -> List[Dict[str, Any]]:
+) -> List[converse.ContentBlock]:
     if isinstance(content, str):
-        content = [{"text": content}]
-    bedrock_content: List[Dict[str, Any]] = []
-    for block in _snake_to_camel_keys(content):
+        content = [converse.ContentBlockText(text=content)]
+    bedrock_content: List[converse.ContentBlock] = []
+    for block in content:
         if isinstance(block, str):
-            bedrock_content.append({"text": block})
+            bedrock_content.append(converse.ContentBlockText(text=block))
         # Assume block is already in bedrock format.
         elif "type" not in block:
-            bedrock_content.append(block)
+            bedrock_content.append(converse.content_block(block))
         elif block["type"] == "text":
-            bedrock_content.append({"text": block["text"]})
+            bedrock_content.append(converse.ContentBlockText(text=block["text"]))
         elif block["type"] == "image":
             # Assume block is already in bedrock format.
             if "image" in block:
-                bedrock_content.append({"image": block["image"]})
+                bedrock_content.append(converse.content_block(block))
             else:
                 bedrock_content.append(
-                    {
-                        "image": {
-                            "format": block["source"]["mediaType"].split("/")[1],
-                            "source": {
-                                "bytes": _b64str_to_bytes(block["source"]["data"])
-                            },
-                        }
-                    }
+                    converse.ContentBlockImage(
+                        image=converse.ImageBlock(
+                            format=block["source"]["media_type"].split("/")[1],
+                            source=converse.ImageSource(
+                                bytes=_b64str_to_bytes(block["source"]["data"])
+                            ),
+                        )
+                    )
                 )
         elif block["type"] == "image_url":
             # Support OpenAI image format as well.
             bedrock_content.append(
-                {"image": _format_openai_image_url(block["imageUrl"]["url"])}
+                converse.ContentBlockImage(
+                    image=converse.ImageBlock(
+                        **_format_openai_image_url(block["imageUrl"]["url"])
+                    )
+                ),
             )
         elif block["type"] == "video":
             # Assume block is already in bedrock format.
             if "video" in block:
-                bedrock_content.append({"video": block["video"]})
+                bedrock_content.append(converse.content_block(block))
             else:
+                format = block["source"]["media_type"].split("/")[1]
                 if block["source"]["type"] == "base64":
-                    bedrock_content.append(
-                        {
-                            "video": {
-                                "format": block["source"]["mediaType"].split("/")[1],
-                                "source": {
-                                    "bytes": _b64str_to_bytes(block["source"]["data"])
-                                },
-                            }
-                        }
+                    source = converse.SourceBytes(
+                        bytes=_b64str_to_bytes(block["source"]["data"])
                     )
                 elif block["source"]["type"] == "s3Location":
-                    bedrock_content.append(
-                        {
-                            "video": {
-                                "format": block["source"]["mediaType"].split("/")[1],
-                                "source": {"s3Location": block["source"]["data"]},
-                            }
-                        }
+                    source = converse.VideoSourceS3Location(
+                        s3Location=block["source"]["data"]
                     )
+                bedrock_content.append(
+                    converse.ContentBlockVideo(
+                        video=converse.VideoBlock(format=format, source=source)
+                    )
+                )
+
         elif block["type"] == "video_url":
             # Support OpenAI image format as well.
             bedrock_content.append(
-                {"video": _format_openai_video_url(block["videoUrl"]["url"])}
+                converse.ContentBlockVideo(
+                    video=converse.VideoBlock(
+                        **_format_openai_video_url(block["videoUrl"]["url"])
+                    )
+                )
             )
         elif block["type"] == "document":
             # Assume block in bedrock document format
-            bedrock_content.append({"document": block["document"]})
+            bedrock_content.append(converse.content_block(block))
         elif block["type"] == "tool_use":
             bedrock_content.append(
-                {
-                    "toolUse": {
-                        "toolUseId": block["id"],
-                        "input": block["input"],
-                        "name": block["name"],
-                    }
-                }
+                converse.ContentBlockToolUse(
+                    tool_use=converse.ToolUseBlock(
+                        tool_use_id=block["id"],
+                        input=block["input"],
+                        name=block["name"],
+                    )
+                )
             )
         elif block["type"] == "tool_result":
             bedrock_content.append(
-                {
-                    "toolResult": {
-                        "toolUseId": block["toolUseId"],
-                        "content": _lc_content_to_bedrock(block["content"]),
-                        "status": "error" if block.get("isError") else "success",
-                    }
-                }
+                converse.ContentBlockToolResult(
+                    tool_result=converse.ToolResultBlock(
+                        tool_use_id=block["tool_use_id"],
+                        content=_lc_content_to_bedrock(block["content"]),
+                        status="error" if block.get("is_error") else "success",
+                    )
+                )
             )
         # Only needed for tool_result content blocks.
         elif block["type"] == "json":
-            bedrock_content.append({"json": block["json"]})
+            bedrock_content.append(converse.ContentBlockJson(json=block["json"]))
+
         elif block["type"] == "guard_content":
-            bedrock_content.append({"guardContent": {"text": {"text": block["text"]}}})
+            bedrock_content.append(
+                converse.ContentBlockGuardrail(
+                    guard_content=converse.GuardrailConverseContentBlockText(
+                        text=converse.GuardrailConverseTextBlock(text=block["text"])
+                    )
+                )
+            )
         elif block["type"] == "thinking":
-            if block.get("signature", ""):
+            if signature := block.get("signature"):
                 bedrock_content.append(
-                    {
-                        "reasoningContent": {
-                            "reasoningText": {
-                                "text": block.get("thinking", ""),
-                                "signature": block.get("signature", ""),
-                            }
-                        }
-                    }
+                    converse.ContentBlockReasoning(
+                        reasoning_content=converse.ReasoningContentBlockText(
+                            reasoning_text=converse.ReasoningTextBlock(
+                                text=block["thinking"],
+                                signature=block["signature"],
+                            )
+                        )
+                    )
                 )
         elif block["type"] == "reasoning_content":
-            reasoning_content = block.get("reasoningContent", {})
-            if reasoning_content.get("signature", ""):
+            reasoning_content = block.get("reasoning_content", {})
+            if signature := reasoning_content.get("signature"):
                 bedrock_content.append(
-                    {
-                        "reasoningContent": {
-                            "reasoningText": {
-                                "text": reasoning_content.get("text", ""),
-                                "signature": reasoning_content.get("signature", ""),
-                            }
-                        }
-                    }
+                    converse.ContentBlockReasoning(
+                        reasoning_content=converse.ReasoningContentBlockText(
+                            reasoning_text=converse.ReasoningTextBlock(
+                                text=reasoning_content["text"],
+                                signature=signature,
+                            )
+                        )
+                    )
                 )
         else:
             raise ValueError(f"Unsupported content block type:\n{block}")
     # drop empty text blocks
-    return [block for block in bedrock_content if block.get("text", True)]
+    return [
+        block
+        for block in bedrock_content
+        if not isinstance(block, converse.ContentBlockText) or block.text
+    ]
 
 
 def _bedrock_to_lc(content: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -1365,29 +1381,23 @@ def _str_if_single_text_block(
 
 
 def _upsert_tool_calls_to_bedrock_content(
-    content: List[Dict[str, Any]], tool_calls: List[ToolCall]
-) -> List[Dict[str, Any]]:
-    existing_tc_blocks = [block for block in content if "toolUse" in block]
+    content: List[converse.ContentBlock], tool_calls: List[ToolCall]
+) -> List[converse.ContentBlock]:
+    existing_tc_blocks = [
+        block for block in content if isinstance(block, converse.ContentBlockToolUse)
+    ]
     for tool_call in tool_calls:
-        if tool_call["id"] in [
-            block["toolUse"]["toolUseId"] for block in existing_tc_blocks
+        if tool_call["id"] not in [
+            block.tool_use.tool_use_id for block in existing_tc_blocks
         ]:
-            tc_block = next(
-                block
-                for block in existing_tc_blocks
-                if block["toolUse"]["toolUseId"] == tool_call["id"]
-            )
-            tc_block["toolUse"]["input"] = tool_call["args"]
-            tc_block["toolUse"]["name"] = tool_call["name"]
-        else:
             content.append(
-                {
-                    "toolUse": {
-                        "toolUseId": tool_call["id"],
-                        "input": tool_call["args"],
-                        "name": tool_call["name"],
-                    }
-                }
+                converse.ContentBlockToolUse(
+                    tool_use=converse.ToolUseBlock(
+                        tool_use_id=tool_call["id"],
+                        input=tool_call["args"],
+                        name=tool_call["name"],
+                    )
+                )
             )
     return content
 
