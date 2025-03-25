@@ -92,11 +92,11 @@ def test_tool_configuration():
         ),
     )
 
-    tool_config = ToolConfiguration(tools={"get_weather": get_weather_tool})
+    tool_config = ToolConfiguration(tools=[get_weather_tool])
 
     expected = {
-        "tools": {
-            "get_weather": {
+        "tools": [
+            {
                 "toolSpec": {
                     "name": "get_weather",
                     "inputSchema": {
@@ -104,7 +104,7 @@ def test_tool_configuration():
                     },
                 },
             },
-        },
+        ],
     }
 
     assert tool_config.to_bedrock_dict() == expected
@@ -375,8 +375,8 @@ def test_bedrock_converse_request():
             "topP": 0.5,
         },
         "toolConfig": {
-            "tools": {
-                "get_weather": {
+            "tools": [
+                {
                     "toolSpec": {
                         "name": "get_weather",
                         "inputSchema": {
@@ -390,7 +390,7 @@ def test_bedrock_converse_request():
                         },
                     },
                 },
-            },
+            ],
             "toolChoice": {
                 "tool": {
                     "name": "get_weather",
@@ -445,8 +445,8 @@ def test_bedrock_converse_request():
             "top_p": 0.5,
         },
         "tool_config": {
-            "tools": {
-                "get_weather": {
+            "tools": [
+                {
                     "tool_spec": {
                         "name": "get_weather",
                         "input_schema": {
@@ -460,7 +460,7 @@ def test_bedrock_converse_request():
                         },
                     },
                 },
-            },
+            ],
             "tool_choice": {
                 "tool": {
                     "name": "get_weather",

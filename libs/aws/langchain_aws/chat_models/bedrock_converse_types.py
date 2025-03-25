@@ -75,7 +75,7 @@ class Tool(BedrockBaseModel):
 
 
 class ToolConfiguration(BedrockBaseModel):
-    tools: dict[str, Tool]
+    tools: list[Tool]
     tool_choice: ToolChoice | None = None
 
 

@@ -628,7 +628,7 @@ class ChatBedrockConverse(BaseChatModel):
         **kwargs: Any,
     ) -> ChatResult:
         """Top Level call"""
-        params = self._converse_params(messages, stop=stop, **kwargs)
+        params = self._converse_params(messages=messages, stop=stop, **kwargs)
         logger.debug(f"Bedrock params: {params}")
         logger.info("Using Bedrock Converse API to generate response")
         response = self.client.converse(**params)
@@ -644,7 +644,7 @@ class ChatBedrockConverse(BaseChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> Iterator[ChatGenerationChunk]:
-        params = self._converse_params(messages, stop=stop, **kwargs)
+        params = self._converse_params(messages=messages, stop=stop, **kwargs)
         logger.debug(f"Bedrock params: {params}")
         response = self.client.converse_stream(**params)
         for event in response["stream"]:
