@@ -1313,11 +1313,6 @@ def _extract_tool_calls(anthropic_content: List[dict]) -> List[ToolCall]:
     return tool_calls
 
 
-def _snake_to_camel(text: str) -> str:
-    split = text.split("_")
-    return "".join(split[:1] + [s.title() for s in split[1:]])
-
-
 def _camel_to_snake(text: str) -> str:
     pattern = re.compile(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
     return pattern.sub("_", text).lower()
@@ -1335,34 +1330,6 @@ def _camel_to_snake_keys(obj: _T) -> _T:
         )
     else:
         return obj
-
-
-def _snake_to_camel_keys(obj: _T, excluded_keys: set = set()) -> _T:
-    if isinstance(obj, list):
-        return cast(
-            _T, [_snake_to_camel_keys(e, excluded_keys=excluded_keys) for e in obj]
-        )
-    elif isinstance(obj, dict):
-        _dict = {}
-        for k, v in obj.items():
-            if k in excluded_keys:
-                _dict[k] = v
-            else:
-                _dict[_snake_to_camel(k)] = _snake_to_camel_keys(
-                    v, excluded_keys=excluded_keys
-                )
-        return cast(_T, _dict)
-    else:
-        return obj
-
-
-def _drop_none(obj: Any) -> Any:
-    if isinstance(obj, dict):
-        new = {k: _drop_none(v) for k, v in obj.items() if _drop_none(v) is not None}
-        return new
-    else:
-        return obj
-
 
 def _b64str_to_bytes(base64_str: str) -> bytes:
     return base64.b64decode(base64_str.encode("utf-8"))

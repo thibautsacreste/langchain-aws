@@ -26,8 +26,6 @@ from langchain_aws.chat_models.bedrock_converse import (
     _extract_response_metadata,
     _lc_content_to_bedrock,
     _messages_to_bedrock,
-    _snake_to_camel,
-    _snake_to_camel_keys,
 )
 
 
@@ -431,11 +429,6 @@ _CAMEL_SNAKE = [
 
 
 @pytest.mark.parametrize(["camel", "snake"], _CAMEL_SNAKE)
-def test__snake_to_camel(camel: str, snake: str) -> None:
-    assert _snake_to_camel(snake) == camel
-
-
-@pytest.mark.parametrize(["camel", "snake"], _CAMEL_SNAKE)
 def test__camel_to_snake(camel: str, snake: str) -> None:
     assert _camel_to_snake(camel) == snake
 
@@ -446,10 +439,6 @@ _SNAKE_DICT = {"tool_use": {"tool_use_id": "fooBar"}}
 
 def test__camel_to_snake_keys() -> None:
     assert _camel_to_snake_keys(_CAMEL_DICT) == _SNAKE_DICT
-
-
-def test__snake_to_camel_keys() -> None:
-    assert _snake_to_camel_keys(_SNAKE_DICT) == _CAMEL_DICT
 
 
 def test__format_openai_image_url() -> None:
